@@ -303,15 +303,33 @@
         </div>
       </div>
       <input type="range" id="diceSlider" min="1" max="12" value="2">
+
+      <div class="controls" style="margin-top: 18px; margin-bottom: 0;">
+        <label>Gyakorlás</label>
+      </div>
+      <div class="mode-options">
+        <label><input type="radio" name="mode" value="none" checked> Nincs, csak dobás</label>
+        <label><input type="radio" name="mode" value="add"> Összeadás</label>
+        <label><input type="radio" name="mode" value="sub"> Kivonás</label>
+      </div>
     </div>
 
     <div class="card">
       <div class="dice-tray" id="diceTray"></div>
       <button class="roll-btn" id="rollBtn">Dobás!</button>
       <div class="result" id="result"></div>
+
+      <div class="practice-box" id="practiceBox">
+        <div class="question" id="question"></div>
+        <div class="answer-row">
+          <input type="number" id="answerInput" placeholder="?">
+          <button type="button" id="checkBtn">Ellenőrzés</button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+      </div>
     </div>
 
-    <footer>Kattints a “Dobás!” gombra, vagy nyomj szóközt / Entert.</footer>
+    <footer>Kattints a “Dobás!” gombra, vagy nyomj szóközt. Gyakorlás módban írd be a választ, és nyomj Entert vagy kattints az Ellenőrzésre.</footer>
   </div>
 
 <script>
@@ -322,9 +340,22 @@
   const resultEl = document.getElementById('result');
   const decreaseBtn = document.getElementById('decreaseBtn');
   const increaseBtn = document.getElementById('increaseBtn');
+  const modeInputs = document.querySelectorAll('input[name="mode"]');
+  const practiceBox = document.getElementById('practiceBox');
+  const questionEl = document.getElementById('question');
+  const answerInput = document.getElementById('answerInput');
+  const checkBtn = document.getElementById('checkBtn');
+  const feedbackEl = document.getElementById('feedback');
 
   const MIN_DICE = 1;
   const MAX_DICE = 12;
+
+  let currentValues = [];
+  let currentAnswer = null;
+
+  function getMode() {
+    return document.querySelector('input[name="mode"]:checked').value;
+  }
 
   const pipLayouts = {
     1: [5],
@@ -386,10 +417,58 @@
       showFace(die, face);
     });
 
-    const sum = values.reduce((a, b) => a + b, 0);
-    resultEl.innerHTML = values.length > 1
-      ? `Dobott értékek: <strong>${values.join(', ')}</strong> — Összeg: <strong>${sum}</strong>`
-      : `Dobott érték: <strong>${sum}</strong>`;
+    currentValues = values;
+    const mode = getMode();
+
+    feedbackEl.textContent = '';
+    feedbackEl.className = 'feedback';
+    answerInput.value = '';
+
+    if (mode === 'none') {
+      practiceBox.classList.remove('active');
+      const sum = values.reduce((a, b) => a + b, 0);
+      resultEl.innerHTML = values.length > 1
+        ? `Dobott értékek: <strong>${values.join(', ')}</strong> — Összeg: <strong>${sum}</strong>`
+        : `Dobott érték: <strong>${sum}</strong>`;
+      return;
+    }
+
+    resultEl.innerHTML = `Dobott értékek: <strong>${values.join(', ')}</strong>`;
+
+    if (mode === 'add') {
+      currentAnswer = values.reduce((a, b) => a + b, 0);
+      questionEl.textContent = values.length > 1
+        ? `Mennyi ${values.join(' + ')}?`
+        : `Mennyi ${values[0]}?`;
+    } else {
+      const sorted = [...values].sort((a, b) => b - a);
+      currentAnswer = sorted.reduce((a, b) => a - b);
+      questionEl.textContent = sorted.length > 1
+        ? `Mennyi ${sorted.join(' - ')}?`
+        : `Mennyi ${sorted[0]}?`;
+    }
+
+    practiceBox.classList.add('active');
+    answerInput.focus();
+  }
+
+  function checkAnswer() {
+    if (currentAnswer === null) return;
+    const guess = parseInt(answerInput.value, 10);
+
+    if (Number.isNaN(guess)) {
+      feedbackEl.textContent = 'Írj be egy számot!';
+      feedbackEl.className = 'feedback wrong';
+      return;
+    }
+
+    if (guess === currentAnswer) {
+      feedbackEl.textContent = '✅ Ügyes vagy, ez helyes!';
+      feedbackEl.className = 'feedback correct';
+    } else {
+      feedbackEl.textContent = `❌ Még nem az, a helyes válasz: ${currentAnswer}`;
+      feedbackEl.className = 'feedback wrong';
+    }
   }
 
   diceCountInput.addEventListener('input', () => setDiceCount(diceCountInput.value));
@@ -401,8 +480,25 @@
 
   rollBtn.addEventListener('click', roll);
 
+  checkBtn.addEventListener('click', checkAnswer);
+  answerInput.addEventListener('keydown', (e) => {
+    if (e.code === 'Enter') {
+      e.preventDefault();
+      checkAnswer();
+    }
+  });
+
+  modeInputs.forEach(input => {
+    input.addEventListener('change', () => {
+      practiceBox.classList.remove('active');
+      resultEl.textContent = '';
+      feedbackEl.textContent = '';
+      feedbackEl.className = 'feedback';
+    });
+  });
+
   document.addEventListener('keydown', (e) => {
-    if (e.code === 'Space' || e.code === 'Enter') {
+    if (e.code === 'Space' && document.activeElement !== answerInput) {
       e.preventDefault();
       roll();
     }
